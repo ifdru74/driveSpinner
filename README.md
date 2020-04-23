@@ -1,5 +1,5 @@
 # driveSpinner
-A small program to prevent HDD from sleeping.
+# A small program to prevent HDD from sleeping.
 I am sorry to say so, but Nowadays greedy HDD producers tried to reduce durability of their products. 
 That will make us to buy a new HDDs because our current HDD quickly became unusable.
 For exampe one famous HDD producer add short sleep timer to all modern HDDs.
