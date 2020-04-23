@@ -23,8 +23,8 @@ namespace sys
         HMODULE hMod = GetModuleHandle(NULL);
         if (hMod != NULL)
         {
-            TCHAR szFileName[MAX_PATH];
-            if (GetModuleFileName(hMod, szFileName, sizeof(szFileName)) != 0)
+            TCHAR szFileName[MAX_PATH*2];
+            if (GetModuleFileName(hMod, szFileName, MAX_PATH * 2) != 0)
             {
                 static const TCHAR  szSpace[] = _T(" ");
                 STDSTRING sCmdParams;
