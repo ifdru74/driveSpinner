@@ -180,7 +180,7 @@ namespace sys
     {
 
     }
-    int DriveSpin::readFileContents(const STDSTRING& fileName)
+    int DriveSpin::readFileContents(const STDSTRING& fileName, LARGE_INTEGER* pos)
     {
         int nRet = 0;
         HANDLE hFile = INVALID_HANDLE_VALUE;
@@ -198,6 +198,19 @@ namespace sys
             DWORD   dwRead = 0;
             size_t  currentPos = 0;
             STDCOUT << print::diagData::timeStamp << _T("File '") << fileName << _T("' opened") << std::endl;
+            if (pos != nullptr)
+            {
+                LARGE_INTEGER newPtr;
+                if (::SetFilePointerEx(hFile, *pos, &newPtr, SEEK_SET))
+                {
+                    STDCOUT << print::diagData::timeStamp << _T("File '") << fileName << _T("' new position set to ") << newPtr.QuadPart << std::endl;
+                    currentPos = newPtr.QuadPart;
+                }
+                else
+                {
+                    STDCOUT << print::diagData::timeStamp << _T("File '") << fileName << _T("' new position was NOT set to ") << pos->QuadPart << std::endl;
+                }
+            }
             BOOL    bRead = FALSE;
             while (bRun && (bRead = ReadFile(hFile, buf, bufLen, &dwRead, NULL)))
             {
@@ -220,13 +233,26 @@ namespace sys
                 STDCERR << print::diagData::timeStamp << _T("Error '") << print::diagData::lastErr.to_string(dwLastErr)
                     << _T("' at position:") << currentPos << std::endl;
             }
-            CloseHandle(hFile);
-            ::Sleep(1000);
             if (!bRun)
             {
-                STDCOUT << print::diagData::timeStamp << _T("Stop at position:") << currentPos << std::endl;
+                LARGE_INTEGER newPtr;
+                memset(&newPtr, 0, sizeof(LARGE_INTEGER));
+                if (::SetFilePointerEx(hFile, newPtr, pos, SEEK_CUR))
+                {
+                    STDCOUT << print::diagData::timeStamp << _T("Stop at position:") << pos->QuadPart << std::endl;
+                }
+                else
+                {
+                    STDCOUT << print::diagData::timeStamp << _T("Stop at position:") << currentPos << std::endl;
+                }
                 nRet = 0;
             }
+            else
+            {
+                memset(pos, 0, sizeof(LARGE_INTEGER));
+            }
+            CloseHandle(hFile);
+            ::Sleep(1000);
         }
         else
         {
@@ -257,7 +283,7 @@ namespace sys
 #endif
                     if (!STD_FILESYSTEM::is_directory(dirIte->status()))
                     {
-                        nRet = readFileContents(rFileName);
+                        nRet = readFileContents(rFileName, nullptr);
                     }
                     else
                     {
@@ -279,6 +305,7 @@ namespace sys
     int DriveSpin::spinDrive(STDSTRING& drive)
     {
         int nRet = 0;
+        const TCHAR cPathSep = _T('\\');
         if (DriveSpin::IsElevated())
         {   // privileged mode - physical access
             dwDesiredAccess = 0x80000000 | 0x40000000;
@@ -288,10 +315,40 @@ namespace sys
             {
                 fileName += print::timeStamp::cDblDot;
             }
+            LARGE_INTEGER pos;
+            memset(&pos, 0, sizeof(LARGE_INTEGER));
+            STDSTRING   cfgFileName;
+            if (!getEnvVar(_T("APPDATA"), cfgFileName))
+            {
+                cfgFileName.assign(drive);
+                if (cfgFileName.at(drive.length() - 1) != print::timeStamp::cDblDot)
+                {
+                    cfgFileName += print::timeStamp::cDblDot;
+                }
+            }
+            cfgFileName += cPathSep;
+            cfgFileName += _T("driveSpin");
+            ::CreateDirectory(cfgFileName.c_str(), NULL);
+            cfgFileName += cPathSep;
+            cfgFileName += _T("current.pos");
+            STDIFSTREAM cfg;
+            cfg.open(cfgFileName.c_str());
+            if (cfg.is_open())
+            {
+                cfg >> pos.QuadPart;
+            }
+            cfg.close();
             while (bRun && nRet == 0)
             {
-                nRet = readFileContents(fileName);
+                nRet = readFileContents(fileName, &pos);
             }
+            STDOFSTREAM ocfg;
+            ocfg.open(cfgFileName.c_str());
+            if (ocfg.is_open())
+            {
+                ocfg << pos.QuadPart;
+            }
+            ocfg.close();
         }
         else
         {   // ordinary mode - read all files
@@ -307,5 +364,18 @@ namespace sys
             nRet = scanFolder(drive, 0);
         }
         return nRet;
+    }
+    bool DriveSpin::getEnvVar(const TCHAR* varName, STDSTRING& val)
+    {
+        if (varName != NULL)
+        {
+            TCHAR buf[4096];
+            if (::GetEnvironmentVariable(varName, buf, sizeof(buf)))
+            {
+                val.assign(buf);
+                return true;
+            }
+        }
+        return false;
     }
 };
