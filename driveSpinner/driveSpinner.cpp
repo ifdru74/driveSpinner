@@ -4,6 +4,7 @@
 #include "diagData.h"
 #include "DriveSpin.h"
 
+
 int _tmain(int argc, const TCHAR* argv[])
 {
     STDSTRING drive;

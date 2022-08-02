@@ -3,6 +3,8 @@
 #include "pch.h"
 #include "DriveSpin.h"
 #include "diagData.h"
+#include "SysLoad.h"
+
 #if _MSC_VER>=1900 && __cplusplus>=201703L
 #include <filesystem>
 #define STD_FILESYSTEM  std::filesystem
@@ -165,7 +167,7 @@ namespace sys
         DriveSpin::bRun = false;
         return bRet;
     }
-    DriveSpin::DriveSpin() : dwDesiredAccess(FILE_READ_ACCESS)
+    DriveSpin::DriveSpin() : dwDesiredAccess(FILE_READ_ACCESS), sysLd()
     {
         if (SetConsoleCtrlHandler(DriveSpin::CtrlHandler, TRUE))
         {
@@ -194,7 +196,7 @@ namespace sys
         if (hFile != NULL && hFile != INVALID_HANDLE_VALUE)
         {
             DWORD  bufLen = PAGE_SIZE;
-            char    buf[PAGE_SIZE];
+            char    buf[PAGE_SIZE*4+2];
             DWORD   dwRead = 0;
             size_t  currentPos = 0;
             STDCOUT << print::diagData::timeStamp << _T("File '") << fileName << _T("' opened") << std::endl;
@@ -215,6 +217,7 @@ namespace sys
             while (bRun && (bRead = ReadFile(hFile, buf, bufLen, &dwRead, NULL)))
             {
                 currentPos += dwRead;
+                int nCPULoad = sysLd.GetCPULoad();
                 if (dwRead != bufLen)
                 {
                     STDCOUT << print::diagData::timeStamp << _T("End of at position:") << currentPos << std::endl;
@@ -223,9 +226,18 @@ namespace sys
                 }
                 else
                 {
-                    STDCOUT << print::diagData::timeStamp << _T("Read at position:") << currentPos << std::endl;
+                    STDCOUT << print::diagData::timeStamp << _T("Read at position:") << currentPos << ", CPU load:" << nCPULoad << std::endl;
                 }
-                ::Sleep(5000);
+                if (nCPULoad < 10)
+                {
+                    bufLen = PAGE_SIZE * 4;
+                    ::Sleep(1000);
+                }
+                else
+                {
+                    bufLen = PAGE_SIZE;
+                    ::Sleep(5000);
+                }
             }
             if (!bRead)
             {

@@ -1,9 +1,11 @@
 #pragma once
 #include <wtypes.h>
+#include "SysLoad.h"
 namespace sys
 {
 	class DriveSpin
 	{
+		SysLoad sysLd;
 		unsigned long dwDesiredAccess;
 		int readFileContents(const STDSTRING& fileName, LARGE_INTEGER* pos = nullptr);
 		int scanFolder(const STDSTRING& rootFolder, int level);
